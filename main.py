@@ -77,6 +77,7 @@ if __name__ == '__main__':
     post_url = rf"https://tieba.baidu.com/p/{tid}?see_lz=1"
 
     img_dir = "./images"
+
     session = requests.session()
     cookies_dict = getcookies_decode_to_dict()
     session.cookies.update(cookies_dict)
