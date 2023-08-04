@@ -41,18 +41,20 @@ def get_text(soup, img_dir) -> list:
     for item in items_with_class:
         # 去除首尾空格
         text = item.get_text().strip() + "\n"
-        # 保存可能存在的图片
+        # 保存可能存在的所有图片
         soup_img = BeautifulSoup(str(item), "lxml")
         try:
-            img_src = soup_img.find('img')['src']
-            # print(img_src)
-            img_name = (img_src.split("/")[-1]).split("?")[0]
-            # print(img_name)
-            img_path = os.path.join(img_dir, img_name)
-            img_text = f"![{img_name.split('.')[0]}]({img_path})"
-            text += img_text + "\n"
-            with open(img_path, "wb") as f:
-                f.write(requests.get(img_src).content)
+            imgs = soup_img.find_all('img')
+            for img in imgs:
+                img_src = img['src']
+                # print(img_src)
+                img_name = (img_src.split("/")[-1]).split("?")[0]
+                # print(img_name)
+                img_path = os.path.join(img_dir, img_name)
+                img_text = f"![{img_name.split('.')[0]}]({img_path})"
+                text += img_text + "\n"
+                with open(img_path, "wb") as f:
+                    f.write(requests.get(img_src).content)
         except:
             # print("没有图片")
             pass
@@ -73,52 +75,57 @@ def get_floor_info(soup):
 
 
 if __name__ == '__main__':
-    tid = "8528911427"
-    post_url = rf"https://tieba.baidu.com/p/{tid}?see_lz=1"
+    tid_list = ['8528772441', '8530770667', '8533372985', '8534853232']
 
     img_dir = "./images"
 
     session = requests.session()
     cookies_dict = getcookies_decode_to_dict()
     session.cookies.update(cookies_dict)
+    base_dir = os.getcwd()
 
-    title, author, sumpage = get_title_and_sumpage(session, post_url)
-    print(title, sumpage)
+    for tid in tid_list:
+        post_url = rf"https://tieba.baidu.com/p/{tid}?see_lz=1"
 
-    # 创建以标题为名的文件夹
-    if not os.path.exists(title):
-        os.mkdir(title)
-    os.chdir(title)
-    if not os.path.exists(img_dir):
-        os.mkdir(img_dir)
+        title, author, sumpage = get_title_and_sumpage(session, post_url)
+        print(title, sumpage)
 
-    text_list = []
+        # 创建以标题为名的文件夹
+        if not os.path.exists(title):
+            os.mkdir(title)
+        os.chdir(title)
+        if not os.path.exists(img_dir):
+            os.mkdir(img_dir)
 
-    # eg.[['1楼', '2023-07-31 02:10'], ['2楼', '2023-07-31 02:12']]
-    floor_info_list = []
-    content_str = f"## {title}\n\n原文地址：{post_url}\n\n作者：{author}\n\n"
+        text_list = []
 
-    for i in range(1, sumpage + 1):
-        print(f"共{sumpage}页，正在下载第{i}页")
-        page_url = rf"https://tieba.baidu.com/p/{tid}?see_lz=1&pn={i}"
-        response = session.get(page_url, headers=headers)
-        soup = BeautifulSoup(response.text, 'lxml')
-        floor_info_list.append(get_floor_info(soup))
-        text_list.append(get_text(soup, img_dir))
+        # eg.[['1楼', '2023-07-31 02:10'], ['2楼', '2023-07-31 02:12']]
+        floor_info_list = []
+        content_str = f"## {title}\n\n原文地址：{post_url}\n\n作者：{author}\n\n"
 
-    # with open('floor_info_list.json', 'w', encoding='utf-8') as f:
-    #     f.write(json.dumps(floor_info_list, ensure_ascii=False))
-    #
-    # with open('text_list.json', 'w', encoding='utf-8') as f:
-    #     f.write(json.dumps(text_list, ensure_ascii=False))
+        for i in range(1, sumpage + 1):
+            print(f"共{sumpage}页，正在下载第{i}页")
+            page_url = rf"https://tieba.baidu.com/p/{tid}?see_lz=1&pn={i}"
+            response = session.get(page_url, headers=headers)
+            soup = BeautifulSoup(response.text, 'lxml')
+            floor_info_list.append(get_floor_info(soup))
+            text_list.append(get_text(soup, img_dir))
 
-    # 共8页就是range(7)
-    for i in range(sumpage):
-        print(f"正在写入第{i + 1}页")
-        for floor, text in zip(floor_info_list[i], text_list[i]):
-            content_str += f'##### <span id="{floor[0]}">{floor[0]} 发表于{floor[1]}</span>\n'
-            content_str += text + "\n"
+        # with open('floor_info_list.json', 'w', encoding='utf-8') as f:
+        #     f.write(json.dumps(floor_info_list, ensure_ascii=False))
+        #
+        # with open('text_list.json', 'w', encoding='utf-8') as f:
+        #     f.write(json.dumps(text_list, ensure_ascii=False))
 
-    # print(content_str)
-    with open('content.md', 'w', encoding='utf-8') as f:
-        f.write(content_str)
+        for i in range(sumpage):
+            print(f"正在写入第{i + 1}页")
+            for floor, text in zip(floor_info_list[i], text_list[i]):
+                content_str += f'##### <span id="{floor[0]}">{floor[0]} 发表于{floor[1]}</span>\n'
+                content_str += text + "\n"
+
+        # print(content_str)
+        with open(f'{title}.md', 'w', encoding='utf-8') as f:
+            f.write(content_str)
+
+        # 退出该文件夹，回到根目录
+        os.chdir(base_dir)
